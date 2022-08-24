@@ -3,6 +3,7 @@ from tensorflow import keras
 import numpy as np
 import cv2
 import os
+import requests
 
 from keras.applications.vgg16 import VGG16
 from flask import Flask, request
@@ -66,13 +67,14 @@ def studypredict():
 def testpredict():
     data =  [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003, 21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
     file = request.files['file']
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
+    wname = request.form['wname']
+    testindex = request.form['index']
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename)) # 나중에 DB에 저장하는 것으로 변경 될 가능성 있음
 
-    imagearr = x = x_features = answer = []
-    # y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    y = [0, 0, 0, 0, 0, 0]
-    # y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    imagearr = x = x_features = pred = []
     index = 0
+    answer = False
+    y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224,224,3))
     model = tf.keras.models.load_model('./cnnlstm_datasetver4.1.h5')
 
@@ -96,18 +98,28 @@ def testpredict():
     x_features = x_features.reshape(x_features.shape[0],
                 x_features.shape[1] * x_features.shape[2], x_features.shape[3])
 
-    answer = model.predict(x_features)
-    print(answer)
+    pred = model.predict(x_features)
+    print(pred)
     
 
-    for i in range(len(answer)):
+    for i in range(len(pred)):
         for _ in range(11):
-            index = np.argmax(answer[i])
+            index = np.argmax(pred[i])
             y[index]+=1
 
     index = np.argmax(y)
+    
+    if (wname == str(data[index])):
+        answer = True
+    
+    json = {
+        "index" : testindex,
+        "result" : answer
+    }
+    
+    res = requests.put("http://127.0.0.1:5000", json=json)
 
-    return str(index)
+    return str(res) # str은 미정
 
 if __name__ == '__main__':
     app.run(debug=True)
