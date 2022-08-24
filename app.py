@@ -28,7 +28,7 @@ def studypredict():
     y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     base_model = VGG16(weights='imagenet', include_top=False,
                        input_shape=(224, 224, 3))
-    model = tf.keras.models.load_model('./cnnlstm_datasetver4.1.h5')
+    model = tf.keras.models.load_model('./model/cnnlstm_datasetver4.1.h5')
 
     # frame cut
     vidcap = cv2.VideoCapture(file.filename)
@@ -82,7 +82,7 @@ def testpredict():
     y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     base_model = VGG16(weights='imagenet', include_top=False,
                        input_shape=(224, 224, 3))
-    model = tf.keras.models.load_model('./cnnlstm_datasetver4.1.h5')
+    model = tf.keras.models.load_model('./model/cnnlstm_datasetver4.1.h5')
 
     # frame cut
     vidcap = cv2.VideoCapture(file.filename)
