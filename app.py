@@ -16,12 +16,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/model/study', methods=['POST'])
 def studypredict():
-    data = [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003,
-            21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
     file = request.files['file']
     word_id = request.form['word_id']
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
-
+    # data = [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003, 21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
+    
     imagearr = x = x_features = pred = []
     index = 0
     answer = False
@@ -60,10 +59,12 @@ def studypredict():
 
     index = np.argmax(y)
 
-    if (word_id == str(data[index])):
+    if (word_id == index + 1):
         answer = True
 
     return str(answer)
+    # return str(word_id)
+    
 
 
 @app.route('/model/test', methods=['POST'])
@@ -122,7 +123,7 @@ def testpredict():
         "result": answer
     }
 
-    res = requests.put("http://127.0.0.1:8080", json=json)
+    res = requests.patch("http://localhost:8080/test/", json=json)
 
     return str(res)  # str은 미정
 
