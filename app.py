@@ -24,6 +24,7 @@ def studypredict():
     imagearr = x = x_features = pred = []
     index = 0
     answer = False
+    # y = [0, 0, 0, 0, 0, 0]
     y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     base_model = VGG16(weights='imagenet', include_top=False,
                        input_shape=(224, 224, 3))
@@ -56,24 +57,33 @@ def studypredict():
     # print(format(pred,'.2f'))
 
     # pred의 길이만큼 최댓값을 찾아서 y에 넣어준다 (100 곱해줘서 %로 만들어줌)
-    for i in range(len(pred)):
-        index = np.argmax(pred[i])
-        y[index] +=pred[i][index] * 100
+    for i in range(len(y)):
+        for j in range(len(pred)):   
+            # print(i,j,pred[i][j])
+            y[i] +=pred[j][i]*100
+        # index = np.argmax(pred[i])
+    
+    for i in range(len(y)):
+        y[i] = y[i]/len(pred)
+    
+    print(y)
+        
 
     # y를 내림차순으로 정렬하여 상위 3개의 퍼센트를 구한다.
     sort_predict=sorted(y,reverse = True)
+    rank_result=[]
     rank_result=sort_predict[:3]
     rank_word=[]
 
-    print(y)
+    # print(y)
     print(rank_result)
 
     # y에서 상위 3개 퍼센트의 인덱스를 찾아 어떤 단어인지 파악한다.
     for i in range(len(rank_result)):
         rank_word.append(y.index(rank_result[i]))
     
-    for i in range(3):
-        rank_result[i]=rank_result[i]/len(pred)
+    # for i in range(3):
+    #     rank_result[i]=rank_result[i]/len(pred)*100
         
     print("-------------------------")
     print(rank_word, rank_result)
@@ -100,13 +110,13 @@ def testpredict():
             21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
     file = request.files['file']
     wname = request.form['wname']
-    testindex = request.form['testindex']
+    testListIndex = request.form['testListIndex']
     # 나중에 DB에 저장하는 것으로 변경 될 가능성 있음
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
 
     imagearr = x = x_features = pred = []
     index = 0
-    answer = False
+    answer = 0
     y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     base_model = VGG16(weights='imagenet', include_top=False,
                        input_shape=(224, 224, 3))
@@ -142,18 +152,15 @@ def testpredict():
     index = np.argmax(y)
 
     if (wname == str(data[index])):
-        answer = True
+        answer = 1
 
     # json = {
     #     "index": testindex,
     #     "result": answer
     # }
 
-    testindex = 18
-    answer =  0
-
     json = {
-        "testListIdx" : testindex,
+        "testListIdx" : testListIndex,
         "result" : answer
     }
 
