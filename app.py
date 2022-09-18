@@ -16,12 +16,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/model/study', methods=['POST'])
 def studypredict():
-    data = [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003,
-            21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
     file = request.files['file']
     word_id = request.form['word_id']
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
-
+    # data = [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003, 21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
+    
     imagearr = x = x_features = pred = []
     index = 0
     answer = False
