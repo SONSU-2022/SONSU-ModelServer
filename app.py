@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import os
 import requests
-
+import mediapipe as mp
 from keras.applications.vgg16 import VGG16
 from flask import Flask, request
 
@@ -13,86 +13,133 @@ app = Flask(__name__)
 UPLOAD_FOLDER = ''
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+imagearr = []
+x = []
+pred = []
+rank_result=[]
+rank_word=[]
+index = 0
+data = [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003,
+        21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
+
+# mediapipe 이미지 디텍팅 실습
+seq_length = 30
+
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+hands = mp_hands.Hands(
+    max_num_hands=1,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5)
 
 @app.route('/model/study', methods=['POST'])
 def studypredict():
     file = request.files['file']
     word_id = request.form['word_id']
+    modelfilename = request.form['modelfilename']
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
-    # data = [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003, 21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
-    
-    imagearr = x = x_features = pred = []
-    index = 0
     answer = False
-    # y = [0, 0, 0, 0, 0, 0]
-    y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    base_model = VGG16(weights='imagenet', include_top=False,
-                       input_shape=(224, 224, 3))
-    model = tf.keras.models.load_model('./model/cnnlstm_datasetver7.0.h5')
+    seq = []
+    y = [0, 0, 0, 0, 0, 0]
+    cnt=0
+    y_pred=[]
+
+    model = tf.keras.models.load_model('./model/' + modelfilename)
 
     # frame cut
-    vidcap = cv2.VideoCapture(file.filename)
-    success, image = vidcap.read()
+    cap = cv2.VideoCapture(file.filename)
 
-    success = True
+    while cap.isOpened():
+        ret, img = cap.read()
+        # img0 = img.copy()
+        if(ret==False):
+            break
 
-    while success:
-        success, image = vidcap.read()
-        if success:
-            if (int(vidcap.get(1)) % 5 == 0):  # n프레임당 한장씩 캡쳐
-                image = cv2.resize(image, (224, 224))
-                # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                imagearr.append(image)
+        img = cv2.flip(img, 1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        result = hands.process(img)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-    # test
-    x = np.array(imagearr)
+        if result.multi_hand_landmarks is not None:
+            for res in result.multi_hand_landmarks:
+                joint = np.zeros((21, 4))
+                for j, lm in enumerate(res.landmark):
+                    joint[j] = [lm.x, lm.y, lm.z, lm.visibility]
 
-    x_features = base_model.predict(x)
-    x_features = x_features.reshape(x_features.shape[0],
-                                    x_features.shape[1] * x_features.shape[2], x_features.shape[3])
+                # Compute angles between joints
+                v1 = joint[[0, 1, 2, 3, 0, 5, 6, 7, 0, 9, 10, 11, 0,
+                            13, 14, 15, 0, 17, 18, 19], :3]  # Parent joint
+                v2 = joint[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+                            14, 15, 16, 17, 18, 19, 20], :3]  # Child joint
+                v = v2 - v1  # [20, 3]
+                # Normalize v
+                v = v / np.linalg.norm(v, axis=1)[:, np.newaxis]
 
-    pred = model.predict(x_features)
-    np.set_printoptions(precision=3, suppress=True)
-    print(pred)
-    # print(format(pred,'.2f'))
+                # Get angle using arcos of dot product
+                angle = np.arccos(np.einsum('nt,nt->n',
+                                            v[[0, 1, 2, 4, 5, 6, 8, 9, 10,
+                                                12, 13, 14, 16, 17, 18], :],
+                                            v[[1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 19], :]))  # [15,]
 
-    # pred의 길이만큼 최댓값을 찾아서 y에 넣어준다 (100 곱해줘서 %로 만들어줌)
-    for i in range(len(y)):
-        for j in range(len(pred)):   
-            # print(i,j,pred[i][j])
-            y[i] +=pred[j][i]*100
-        # index = np.argmax(pred[i])
-    
-    for i in range(len(y)):
-        y[i] = y[i]/len(pred)
-    
-    print(y)
-        
+                angle = np.degrees(angle)  # Convert radian to degree
 
-    # y를 내림차순으로 정렬하여 상위 3개의 퍼센트를 구한다.
+                d = np.concatenate([joint.flatten(), angle])
+
+                seq.append(d)
+
+                mp_drawing.draw_landmarks(img, res, mp_hands.HAND_CONNECTIONS)
+
+                if len(seq) < seq_length:
+                    continue
+
+                input_data = np.expand_dims(
+                    np.array(seq[-seq_length:], dtype=np.float32), axis=0)
+
+                #predict한 퍼센트 배열
+                y_pred = model.predict(input_data).squeeze()
+                # predict한 영상 장 수 count위함
+                cnt+=1
+                print('y_pred',y_pred) # ex )[9.9989879e-01 1.0122546e-04 2.3264384e-09]
+
+                np.set_printoptions(precision=3, suppress=True)
+
+                for i in range(len(y_pred)):
+                    y[i]+=y_pred[i]*100
+                print('result',y)
+
+
+                # i_pred = 최댓값 위치
+                i_pred = int(np.argmax(y_pred))
+                print('i_pred',i_pred)
+
+                conf = y_pred[i_pred]
+
+                print("conf",conf)
+
+                if conf < 0.9:
+                    continue  
+
+    cap.release()
+
+    for i in range(len(y_pred)):
+        y[i]=y[i]/cnt
+
+    # 내림차순으로 정렬하여 상위 3개의 퍼센트를 구한다.
     sort_predict=sorted(y,reverse = True)
     rank_result=[]
     rank_result=sort_predict[:3]
     rank_word=[]
 
-    # print(y)
-    print(rank_result)
-
-    # y에서 상위 3개 퍼센트의 인덱스를 찾아 어떤 단어인지 파악한다.
     for i in range(len(rank_result)):
         rank_word.append(y.index(rank_result[i]))
-    
-    # for i in range(3):
-    #     rank_result[i]=rank_result[i]/len(pred)*100
         
     print("-------------------------")
     print(rank_word, rank_result)
-
     print(word_id)
     print(rank_word[0]+1)
+
     if (word_id == str(rank_word[0]+1)):
         answer = True
-    
 
     print(answer)
     result_json={
@@ -106,44 +153,91 @@ def studypredict():
 
 @app.route('/model/test', methods=['POST'])
 def testpredict():
-    data = [11001, 11002, 11003, 12001, 12002, 12003, 21001, 21003,
-            21003, 21004, 21005, 21006, 31001, 31002, 31003, 31004, 31005]
     file = request.files['file']
     wname = request.form['wname']
     testListIndex = request.form['testListIndex']
-    # 나중에 DB에 저장하는 것으로 변경 될 가능성 있음
+    modelfilename = request.form['modelfilename']
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
-
-    imagearr = x = x_features = pred = []
-    index = 0
     answer = 0
-    y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    base_model = VGG16(weights='imagenet', include_top=False,
-                       input_shape=(224, 224, 3))
-    model = tf.keras.models.load_model('./model/cnnlstm_datasetver7.0.h5')
+    model = tf.keras.models.load_model('./model/' + modelfilename)
+    seq = []
+    y = [0, 0, 0, 0, 0, 0]
+    cnt=0
+    y_pred=[]
 
     # frame cut
-    vidcap = cv2.VideoCapture(file.filename)
-    success, image = vidcap.read()
+    cap = cv2.VideoCapture(file.filename)
 
-    success = True
+    while cap.isOpened():
+        ret, img = cap.read()
+        # img0 = img.copy()
+        if(ret==False):
+            break
 
-    while success:
-        success, image = vidcap.read()
-        if success:
-            if (int(vidcap.get(1)) % 5 == 0):  # n프레임당 한장씩 캡쳐
-                image = cv2.resize(image, (224, 224))
-                imagearr.append(image)
+        img = cv2.flip(img, 1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        result = hands.process(img)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-    # test
-    x = np.array(imagearr)
+        if result.multi_hand_landmarks is not None:
+            for res in result.multi_hand_landmarks:
+                joint = np.zeros((21, 4))
+                for j, lm in enumerate(res.landmark):
+                    joint[j] = [lm.x, lm.y, lm.z, lm.visibility]
 
-    x_features = base_model.predict(x)
-    x_features = x_features.reshape(x_features.shape[0],
-                                    x_features.shape[1] * x_features.shape[2], x_features.shape[3])
+                # Compute angles between joints
+                v1 = joint[[0, 1, 2, 3, 0, 5, 6, 7, 0, 9, 10, 11, 0,
+                            13, 14, 15, 0, 17, 18, 19], :3]  # Parent joint
+                v2 = joint[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+                            14, 15, 16, 17, 18, 19, 20], :3]  # Child joint
+                v = v2 - v1  # [20, 3]
+                # Normalize v
+                v = v / np.linalg.norm(v, axis=1)[:, np.newaxis]
 
-    pred = model.predict(x_features)
-    print(pred)
+                # Get angle using arcos of dot product
+                angle = np.arccos(np.einsum('nt,nt->n',
+                                            v[[0, 1, 2, 4, 5, 6, 8, 9, 10,
+                                                12, 13, 14, 16, 17, 18], :],
+                                            v[[1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 19], :]))  # [15,]
+
+                angle = np.degrees(angle)  # Convert radian to degree
+
+                d = np.concatenate([joint.flatten(), angle])
+
+                seq.append(d)
+
+                mp_drawing.draw_landmarks(img, res, mp_hands.HAND_CONNECTIONS)
+
+                if len(seq) < seq_length:
+                    continue
+
+                input_data = np.expand_dims(
+                    np.array(seq[-seq_length:], dtype=np.float32), axis=0)
+
+                #predict한 퍼센트 배열
+                y_pred = model.predict(input_data).squeeze()
+                # predict한 영상 장 수 count위함
+                cnt+=1
+                print('y_pred',y_pred) # ex )[9.9989879e-01 1.0122546e-04 2.3264384e-09]
+
+                np.set_printoptions(precision=3, suppress=True)
+
+                for i in range(len(y_pred)):
+                    y[i]+=y_pred[i]*100
+                print('result',y)
+
+                # i_pred = 최댓값 위치
+                i_pred = int(np.argmax(y_pred))
+                print('i_pred',i_pred)
+
+                conf = y_pred[i_pred]
+
+                print("conf",conf)
+
+                if conf < 0.9:
+                    continue
+
+    cap.release()
     
     for i in range(len(pred)):        
         index = np.argmax(pred[i])
@@ -154,11 +248,6 @@ def testpredict():
     if (wname == str(data[index])):
         answer = 1
 
-    # json = {
-    #     "index": testindex,
-    #     "result": answer
-    # }
-
     json = {
         "testListIdx" : testListIndex,
         "result" : answer
@@ -166,10 +255,12 @@ def testpredict():
 
     res = requests.patch("http://127.0.0.1:8080/test", json=json)
 
-    # res = requests.put("http://127.0.0.1:8080", json=json)
+    print(cap)
+    print(modelfilename)
+    print(file)
+    print(file.filename)
 
     return str(res)  # str은 미정
-
 
 if __name__ == '__main__':
     app.run(debug=True)
