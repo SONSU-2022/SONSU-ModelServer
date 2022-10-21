@@ -153,7 +153,7 @@ def studypredict():
     if (word_id == str(rank_word[0]+1)):
         answer = True
 
-    if(rank_word[0] == 0):
+    if(rank_result[0] == 0):
         answer = False      
 
     print(answer)
