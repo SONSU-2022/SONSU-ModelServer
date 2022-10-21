@@ -37,6 +37,7 @@ def studypredict():
     file = request.files['file']
     word_id = request.form['word_id']
     modelfilename = request.form['modelfilename']
+    level = request.form['level']
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
     answer = False
     seq = []
@@ -132,6 +133,17 @@ def studypredict():
 
     for i in range(len(rank_result)):
         rank_word.append(y.index(rank_result[i]))
+
+    print(level)
+
+    if(level == "2"):
+        print(rank_word)
+        for i in range(len(rank_word)):
+            rank_word[i] += 6
+    elif(level == "3"):
+        for i in range(len(rank_word)):
+            rank_word[i] += 12
+        
         
     print("-------------------------")
     print(rank_word, rank_result)
@@ -140,6 +152,9 @@ def studypredict():
 
     if (word_id == str(rank_word[0]+1)):
         answer = True
+
+    if(rank_word[0] == 0):
+        answer = False      
 
     print(answer)
     result_json={
@@ -247,6 +262,9 @@ def testpredict():
 
     if (wname == str(data[index])):
         answer = 1
+
+    if(pred == []):
+        answer = 0  
 
     json = {
         "testListIdx" : testListIndex,
