@@ -254,17 +254,23 @@ def testpredict():
 
     cap.release()
     
-    for i in range(len(pred)):        
-        index = np.argmax(pred[i])
-        y[index] += 1
+    for i in range(len(y_pred)):
+        y[i]=y[i]/cnt
 
-    index = np.argmax(y)
+    # 내림차순으로 정렬하여 상위 3개의 퍼센트를 구한다.
+    sort_predict=sorted(y,reverse = True)
+    rank_result=[]
+    rank_result=sort_predict[:3]
+    rank_word=[]
 
-    if (wname == str(data[index])):
+    for i in range(len(rank_result)):
+        rank_word.append(y.index(rank_result[i])) 
+
+    if(rank_result[0] == 0):
+        answer = False      
+
+    if (wname == str(data[rank_word[0]])):
         answer = 1
-
-    if(pred == []):
-        answer = 0  
 
     json = {
         "testListIdx" : testListIndex,
@@ -273,10 +279,19 @@ def testpredict():
 
     res = requests.patch("http://127.0.0.1:8080/test", json=json)
 
-    print(cap)
-    print(modelfilename)
-    print(file)
-    print(file.filename)
+    # print(cap)
+    # print(modelfilename)
+    # print(file)
+    # print(file.filename)
+    print("----------------")
+    print(pred)
+    print(str(data[rank_word[0]]))
+    print(y)
+    print("wname"+wname)
+    print(answer)
+    print("-------------------------")
+    print(rank_word, rank_result)
+    print(rank_word[0]+1)
 
     return str(res)  # str은 미정
 
