@@ -172,6 +172,7 @@ def testpredict():
     wname = request.form['wname']
     testListIndex = request.form['testListIndex']
     modelfilename = request.form['modelfilename']
+    level = request.form['level']
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
     answer = 0
     model = tf.keras.models.load_model('./model/' + modelfilename)
@@ -265,6 +266,14 @@ def testpredict():
 
     for i in range(len(rank_result)):
         rank_word.append(y.index(rank_result[i])) 
+
+    if(level == "2"):
+        print(rank_word)
+        for i in range(len(rank_word)):
+            rank_word[i] += 6
+    elif(level == "3"):
+        for i in range(len(rank_word)):
+            rank_word[i] += 12
 
     if(rank_result[0] == 0):
         answer = False      
