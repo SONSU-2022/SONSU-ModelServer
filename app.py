@@ -273,13 +273,14 @@ def testpredict():
             rank_word[i] += 6
     elif(level == "3"):
         for i in range(len(rank_word)):
-            rank_word[i] += 12
-
-    if(rank_result[0] == 0):
-        answer = False      
+            rank_word[i] += 12    
 
     if (wname == str(data[rank_word[0]])):
         answer = 1
+        
+    if(rank_result[0] == 0):
+        print("ㅇ우와아아아앙" + str(rank_result[0]))
+        answer = False  
 
     json = {
         "testListIdx" : testListIndex,
@@ -294,7 +295,6 @@ def testpredict():
     # print(file.filename)
     print("----------------")
     print(pred)
-    print(str(data[rank_word[0]]))
     print(y)
     print("wname"+wname)
     print(answer)
